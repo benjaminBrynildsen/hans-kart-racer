@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Kart Racer</title>
+<title>Mario Kart Racer</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
@@ -25,8 +25,8 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .overlay.hidden { display: none; }
 .overlay h1 {
-  font-size: 38px; font-weight: 900;
-  background: linear-gradient(90deg, #ff4444, #ffdd00, #44ff44, #4488ff);
+  font-size: 36px; font-weight: 900;
+  background: linear-gradient(90deg, #ff0000, #ffdd00, #00cc00, #4488ff);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   margin-bottom: 6px;
 }
@@ -36,109 +36,127 @@ canvas { display: block; width: 100%; height: 100%; }
 .btn {
   padding: 16px 44px; border: none; border-radius: 16px;
   font-size: 20px; font-weight: 800; cursor: pointer;
-  background: linear-gradient(135deg, #ff4444, #ffdd00);
-  color: #fff; box-shadow: 0 6px 24px rgba(255,68,68,0.4);
+  background: linear-gradient(135deg, #ff0000, #ffdd00);
+  color: #fff; box-shadow: 0 6px 24px rgba(255,0,0,0.4);
   transition: transform 0.15s; margin-top: 12px;
   text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 .btn:active { transform: scale(0.95); }
 
 .char-select {
-  display: flex; gap: 12px; margin: 16px 0; flex-wrap: wrap; justify-content: center;
+  display: flex; gap: 10px; margin: 16px 0; flex-wrap: wrap; justify-content: center;
 }
 .char-btn {
-  width: 64px; height: 64px; border-radius: 16px;
+  width: 60px; height: 60px; border-radius: 14px;
   border: 3px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08);
-  font-size: 36px; cursor: pointer; transition: all 0.2s;
+  cursor: pointer; transition: all 0.2s;
   display: flex; align-items: center; justify-content: center;
+  flex-direction: column; padding: 4px;
 }
+.char-btn img { width: 36px; height: 36px; image-rendering: pixelated; }
+.char-btn span { font-size: 9px; color: #fff; opacity: 0.7; margin-top: 2px; }
 .char-btn.active { border-color: #ffd200; background: rgba(255,210,0,0.2); transform: scale(1.1); }
-
-.controls-hint {
-  position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
-  color: rgba(255,255,255,0.4); font-size: 12px; z-index: 5;
-  pointer-events: none;
-}
 </style>
 </head>
 <body>
 
 <div class="overlay" id="startScreen">
-  <div style="font-size:64px;margin-bottom:4px">🏎️</div>
-  <h1>Kart Racer</h1>
-  <p class="sub">Dodge traffic & collect coins!</p>
-  <div class="char-select" id="charSelect">
-    <div class="char-btn active" data-char="🏎️">🏎️</div>
-    <div class="char-btn" data-char="🏍️">🏍️</div>
-    <div class="char-btn" data-char="🚗">🚗</div>
-    <div class="char-btn" data-char="🚙">🚙</div>
-    <div class="char-btn" data-char="🏁">🏁</div>
-  </div>
+  <h1>🍄 Mario Kart Racer</h1>
+  <p class="sub">Dodge enemies & collect coins!</p>
+  <div class="char-select" id="charSelect"></div>
   <button class="btn" id="startBtn">🏁 Race!</button>
 </div>
 
 <div class="overlay hidden" id="gameOverScreen">
   <div style="font-size:56px">💥</div>
-  <h1>Crash!</h1>
+  <h1>Game Over!</h1>
   <div class="score-big" id="finalScore">0</div>
   <p class="sub" id="finalDist">0m</p>
   <button class="btn" id="retryBtn">🔄 Race Again</button>
 </div>
 
 <canvas id="game"></canvas>
-<div class="controls-hint" id="hint">← Tilt or touch sides to steer →</div>
 
 <script>
+// Sprite data (top-down pixel karts)
+const SPRITE_DATA = {
+  mario: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABVklEQVR4nO2awQ3DIAxFTdUt2hPKHF0hs2aFzhFxaudIT5UasAkYO4SUd2uUwv/GBizFgDAvgGXrnTuAkZpPZKAU0RSlZor+XCLch2vkwp1QUnzJeCwD0uJLxmWvwFHINqAVfe74SYWjLZoipbD/L4WORvMGWIfHMk8qNWGGMVtP8yvQvIFrzst7ngGpdyP0JWvtSqhzzvjib/PE0UjyHsbg2cPa1W/nXKA3SCFfPPVMG188pYNdA1jEaoy1MhCLNBYRCRMpqfOLr7F4FyoxIREAkW2UI0QqBYOqptLo6VzyoNQOlSOaSiN/J8o6B1KRLPAtghTC9tqc6EuBzYlpi552tRoZDOpkbv4u1A3UphuoTTdQm26gNkktZY2rBIBgSxlrMLRQbymPQlFLqcWuLWVtzmUAq/Ive+5Esbl8jedaAQB8FWIro4VIS+mzZ4sp+TlCp3NmPtjYd25dx15KAAAAAElFTkSuQmCC",
+  luigi: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABWUlEQVR4nO2a3w0CIQzGwTgJcQx3uBWcxAcncQV3cAzTVc43E/6UK6XQ4+T3pneB7yst0OSskeZp1s13bsZKTSczEEU0RqWZOgM1wkOYRk7sCSXFV4zHMyAtvmJc/grshHIDraLPHJ9WOK1FYxAK+w9TaGcMb4B1eKyfV5OasJelWM/wKzC8gXPR2z3PAOLdKPmSc84TCgA2FL9eXwyFGSHvJdbxcN5vAIj0RikUisf+a00oHtPBroFUxDTG8gzkIp2KiIQJSup4zwKN1btQjQmJAIhsoxwhUikYVTWWRnAH8qDYDlUiGkujcCcqOweISBb4FlEKpfbakuhLkZozpS1/2mk1MimQk3n4u9A0oM00oM00oM00oA2tpVS4Shgj2VJmGoxWNG8p90JVS9mKri2lNscykKry37OOO1FurlDjsVbAGKSlzKxMK2RaypCeLabg5wiTyZH5AiFZc7a4DtRjAAAAAElFTkSuQmCC",
+  peach: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABYElEQVR4nO2YuxWCMBSGE4872KMTWDmBrb0jWDuGtSPY2zqBlRNoeqfAwgMH8iLk/uGC5qsU9ea/T7hKAaZ8rkvf53L1kMjzIMa6RDsPBzgzoxqIFU/9bUV0BBCHt4REZoOcAW6iHEBHn2Jz8hkg9MAV3AO73APBoKNPsfmfGRgT2QFueo2u8nz/Ntr2nUSMuC3ql/KwCdJm/VJRFK2JoJSStfgKtBMN8RXL0771Xill6DVKSBfvupYaXbxLR3wPWCLGYavlgC/StohAnAgonSa6RvoUojgBCABmjMYIAZWg0dWuMnodL+FWXROqh2hXGemTaB6uqgfIBu/AKCHbrO0VfRC2M23avHc74+bFiOvOPPlnoewAN9kBbrID3GQHuAlaKTkeJYQArpS+BSMV6VfKkUBbKRMx7ErJzG85YOvyiiEnke8sXeNvZUAIexZ8mUkFZKXUGXLFDP1zN5P5dz5cxoXMswDnagAAAABJRU5ErkJggg==",
+  toad: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABdElEQVR4nO2YLRLCMBCFNwynQHZwuGqwWBwn4BAcgUNwAhwWCxqHYyK5RjEw0+avm2S3aSCfoxM27yW7SbcCiGnquukbI+53QTUfSSCMaKuASDNRf44RrgkJNDIJnZBSfEy8IAPU4mPiBu/AWPA2wLX6ofFRhcMt2gamsP8vhcZG9gaCLo/meWapCTHfeOvJfgeyNzD1GbzcPz+p8+DQ0ooPcDvMUelkHFRVVSfHpZSiHRwA4LqjNbE6LrRnr9O681tKqenVUkgVb3vGjSrepiO4BkwrliJWx4BrpU0rQmECkzptVI3Rp1CMCYoFIDlGQ4RQpaBW1bY0mm0v6KC2E8pHtC2N1JPI6x7AQlngfWgpZDprfVafCtOcJm3O2069vFJiu5mzfxcqBlJTDKSmGEhNMZAaVEuZ4lUCgLCldDUYXLC3lGMhqqXkYtCWMjW/ZcBU5V+GPIlcc6kaf2sHAMy74NoZLkhaSpUhW0zsx91C4d95A9Qii51HmTFPAAAAAElFTkSuQmCC",
+  yoshi: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABWUlEQVR4nO2aOxKCMBCGg+MRPAFjTe0txNbOk9nZirewpnZyAu+AFTOQZEMef1jAfJ2Im39fSXbGQoCp33Vn+745NQVyPYixKdEUCGd2sQZCxcf+tic4AojFh4RmIzoD3AQ5gI5+jM3VZyC4B7rPC5qF4njOPeAMOvoxNv8zA0siO8DN3uflFAcYZd/1amF8qSzLkVApZaGKfx5uIRpJLt+79qy9tqPPUkpNr1ZCqnjqWWpU8ZSO4B4wRYzD1sgBW6RNEUE44VI6Q1SN0btQjBOIAEC20RAhqBLUupoqo+pRORuldigf0VQZqTuR1zngCrLBp9BKyLTX+kQfhWlNkzbraZf65PWBOplXfxfKDnCTHeAmO8BNdoAbp5GS4yohBHCktA0YqUg+Ui6FqJEyFbOOlNxsywFTl/fMuRPZ1lI1bisDQpizYMtMKiAjpcqcIyb6LwmZzFb5AeyvkO90eltqAAAAAElFTkSuQmCC",
+  bowser: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABYUlEQVR4nO2YPRKCMBCFg+MBKKwsGU+AB7HzJPaOvSex8yByAiellQU3wMoZSbIhPy8sYL4OhM3b3eyGtRBgXtdNZ/t9e3oXyPUgxoZEUyCcWcUaCBUf++6X4AggFv8lNBvRGeAmyAF09GNszj4DwTXQPe/RLBS7Q64BZ9DRj7H5nxmYEtkBbtY+D9d1DS9eyn7TNE5t1fhQVVU9oVLKQhX/uJ1DNJLsjxftXtu2vWsppaZX20KqeOpealTxlI7gGjBFjMNWzwFbpE0RQTjhsnV+UTVGd6EYJxABgLTRECGoLahVNbWNyrJ0Nkp1KB/R1DZSO5HXOeAKssCH0LaQqdf6RB+FaU2TNutpl/rk9YE6mWf/LZQd4CY7wE12gJvsADdOIyXHp4QQwJHSNmCkIvlIORWiRspUjDpScrMsB0xV/mXMTmRbS9W4rAwIYc6CLTOpgIyUKmOOmK5/7mYy/84HL4+K15QyDK4AAAAASUVORK5CYII=",
+};
+
+const ENEMY_SPRITES = {
+  goomba: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABXklEQVR4nO2auw3CMBCGHYQYJKKgYhUYgSGQqKCACokhGAFWoaJAHoQmVJES2+f48TuXBH8dIZz/e9k+iUKAOW9Xle370+NdINeDGOsSTYFwZhZrIFR87G9rgiOAWLxJaDaiM8BNkAPo6MfYHH0Ggnug+jyhWSiWm9wDzqCjH2PzPzMwJLID3Mx9Xk5xgFH2Xa8WxpfKsmwJlVIWqvjj7RqikeSyP2jP7q9v67OUUtOrlZAqnnqWGlU8pSO4B0wR47DVcsAWaVNEEE64lE4TVWP0LhTjBCIAkG00RAiqBLWupspot44G6V2KB/RVBmpO5HXOeAKssG70ErItNf6RB+FaU2TNutpl/rk9YE6mUd/F8oOcJMd4CY7wE12gBunkZLjKiEEcKS0DRipSD5SDoWokTIVvY6U3EzLAVOX1/S5E9nWUjVOKwNCmLNgy0wqICOlSp8jJvovCZnMVPkBGE2Lx2jpOlMAAAAASUVORK5CYII=",
+  koopa: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABWElEQVR4nO2YyRHCMAxFHYZKPFTAKV2EOjhTBmfqIF3kRAWMWwknGLzI8fIdZfG7gYP8JVlyRCPADMN59K237atB7gcxNiWaAuHMIddAqvjc335JjgBi839Ss5GdAW6SHEBHP8fm6jOQXAPju4dmoTl1tQaCQUc/x+Y+M7AkqgPcHKOevgt48ZL2b2Et3vmQlFITqpRqTPHjpU9Q6BHy7GwdD6l9VkpZeq0jZIqnviuNKZ7SkVwDrohx2NIc8EXaFRGEEyFHR1szNGZ3oRwnEAGAtNEUIagjaFU1dYzUVQUbpTpUjGjqGJmdKO4eCARZ4FNYR8jVa2Oij8K1p0ub/7YrffPGQNzMq38Xqg5wUx3gpjrATXWAm7CRkuFVQgjkSOkZMEpRfKRcClkjZSlmHSm52ZYDrir/rc3YiXx7mRq3lQEhiJHSk5lSYEZKkzlHzMA/dyuVvfMBtC5/dxO8dVwAAAAASUVORK5CYII=",
+  bobomb: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABU0lEQVR4nO2a7Q2CMBCGW8McmBAncQIncRoncQEnMU1kDhL8RQJtr7a9txxgn5+I1/e+2l6CVmDath1Dv/d9r5HrQYz9Ek2BcObENZArnvvfiewIIBafk5sNdgakyXIAHX2Ozd1nILsHxvcTmgV9udUeiAYdfY7N/8zAlqgOSNOkvFziAKPsx14tvC91XbcQaozRtvjP65GjkeR8vTvPmmYZX2OMo9cpIVs89aw0tnhKR3YP+CImYWvhQCjSvoggnIgpnTm2RvYuxHECEQDINpojBFWCTldTZTQMQ7RRaodKEU2Vkb0TJZ0DsSAb/BdOCfn22pToo/Ct6dMWPO1Kn7wpUCfz7u9C1QFpqgPSVAekqQ5IEzVSSlwllAKOlKEBoxTFR8qtwBopS7HqSCnNsRzwdfnEmjtRaC1b47EyoJQ/C6HMlAIyUtqsOWKiP0moVI7KFxexe0eJrOHtAAAAAElFTkSuQmCC",
+};
+
+const ITEM_SPRITES = {
+  coin: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAwUlEQVR4nO2XwQ2AMAhFqyN50XEczXH04kp6IqkISBWUxP5rC//lc2hJ6e9q7hTNU9q4s2Es66m+LJk+gVEBYPO+4+8uaxmEeJgbS6YaGA6k9TLHddwISQALcy0Em4CFuabPCQAorcwxBE7hAOBlLkGII3hDcQC84wfhMcRJoAJUgM8B4LnE77m1oD/4xUkgBID3GHD8JwBPCMqcBKCKrMwpkQA55VOIq48pm4AFhOZXHHsvkCA0MtuMSmBKd8PPtQNj6VE0PsAAzgAAAABJRU5ErkJggg==",
+  star: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAv0lEQVR4nO2XQRKAIAhFrUvVgTpWB6pT1SadEYEwIZmpv1X4bz4LJYSva3hSdGzhIBvOdT3FlznTFhgRQGE+LfTlfa2CYA8zY85UAEOBjGbmoI4aIQqgYi6EIBNQMRf0KQASpZY5gIApZABm5gwEP4IX5AfAPP4oMAY/CfwAP0B3gPRcgvdcXVf/6OcnARcA5mMA8RcAphCIOQqAFWmZY0IBMspWiJuPKZmACoTgV+x7L2AhBFLbjGpganfD7joBCnhRNBo/7UIAAAAASUVORK5CYII=",
+  mushroom: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAxElEQVR4nO2XsRGAMAhF1Rmss4buX+ka1tlBK+6UABIF5U5/m8B/9ykSmubraq8UTSmt3Nm4LFU91Zcl0zswKgBsPvQ9e3fOuQpCPNwbS6YaGA6k8zLHddwISQALcy0Em4CFuaZPAQCUVuYYAqdwAPAylyDEETyhOADe8YPwGOIk8AP8AK8DwHOJ33NrQX/wi5NACADvMeD4CwBPCMqcBKCKrMwpkQB7yrsQZx9TNgELCM2vOPZeIEFoZLYZ1cDU7oavawO+0XE0ET+qpwAAAABJRU5ErkJggg==",
+};
+
+// Preload images
+const images = {};
+function loadImg(key, src) {
+  const img = new Image();
+  img.src = src;
+  images[key] = img;
+}
+for (const [k,v] of Object.entries(SPRITE_DATA)) loadImg('char_'+k, v);
+for (const [k,v] of Object.entries(ENEMY_SPRITES)) loadImg('enemy_'+k, v);
+for (const [k,v] of Object.entries(ITEM_SPRITES)) loadImg('item_'+k, v);
+
+const CHARACTERS = [
+  { id: 'mario', name: 'Mario' },
+  { id: 'luigi', name: 'Luigi' },
+  { id: 'peach', name: 'Peach' },
+  { id: 'toad', name: 'Toad' },
+  { id: 'yoshi', name: 'Yoshi' },
+  { id: 'bowser', name: 'Bowser' },
+];
+
+const ENEMIES = ['goomba','koopa','bobomb'];
+
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 let W, H;
-function resize() {
-  W = canvas.width = window.innerWidth;
-  H = canvas.height = window.innerHeight;
-}
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
 resize();
 window.addEventListener('resize', resize);
 
-// Game vars
 let running = false;
-let playerChar = '🏎️';
-let playerX = 0; // -1 to 1 (lane position)
+let selectedChar = 'mario';
+let playerX = 0;
 let playerTargetX = 0;
-let speed = 0;
-let maxSpeed = 8;
-let distance = 0;
-let score = 0;
-let coins = [];
-let obstacles = [];
-let roadLines = [];
-let particles = [];
-let boosts = [];
-let shakeTimer = 0;
-let spawnTimer = 0;
-let coinTimer = 0;
-let boostTimer = 0;
-let boosting = 0;
-let steerInput = 0; // -1 left, 0 center, 1 right
-let touchSide = 0;
-let tiltEnabled = false;
+let speed = 0, maxSpeed = 8;
+let distance = 0, score = 0;
+let coins = [], obstacles = [], roadLines = [], particles = [], items = [];
+let shakeTimer = 0, spawnTimer = 0, coinTimer = 0, itemTimer = 0;
+let boosting = 0, invincible = 0, starPower = 0;
+let steerInput = 0, touchSide = 0, tiltEnabled = false;
 
-// Road params
-const ROAD_W_RATIO = 0.6; // road is 60% of screen width
+const ROAD_W_RATIO = 0.55;
 const LANES = 3;
 
-// Characters for obstacles
-const TRAFFIC = ['🚌','🚐','🚛','🚕','🚓','🚑','🚒','🛻'];
-const COIN_EMOJI = '🪙';
-const BOOST_EMOJI = '⚡';
-
-// Character select
-document.querySelectorAll('.char-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
+// Build character select
+const charSelect = document.getElementById('charSelect');
+CHARACTERS.forEach((c, i) => {
+  const div = document.createElement('div');
+  div.className = 'char-btn' + (i === 0 ? ' active' : '');
+  div.dataset.char = c.id;
+  div.innerHTML = `<img src="${SPRITE_DATA[c.id]}"><span>${c.name}</span>`;
+  div.addEventListener('click', () => {
     document.querySelectorAll('.char-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    playerChar = btn.dataset.char;
+    div.classList.add('active');
+    selectedChar = c.id;
   });
+  charSelect.appendChild(div);
 });
 
 document.getElementById('startBtn').addEventListener('click', startGame);
@@ -148,346 +166,268 @@ function startGame() {
   running = true;
   speed = 3; distance = 0; score = 0;
   playerX = 0; playerTargetX = 0;
-  coins = []; obstacles = []; particles = []; boosts = [];
-  roadLines = [];
-  spawnTimer = 0; coinTimer = 0; boostTimer = 0;
-  boosting = 0; shakeTimer = 0;
-
-  // Init road lines
-  for (let y = 0; y < H + 40; y += 40) {
-    roadLines.push({ y });
-  }
-
+  coins = []; obstacles = []; particles = []; items = [];
+  roadLines = []; spawnTimer = 0; coinTimer = 0; itemTimer = 0;
+  boosting = 0; shakeTimer = 0; invincible = 0; starPower = 0;
+  for (let y = 0; y < H + 40; y += 40) roadLines.push({ y });
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('gameOverScreen').classList.add('hidden');
-  document.getElementById('hint').style.display = '';
 
-  // Try gyroscope
   if (window.DeviceOrientationEvent) {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then(r => {
-        if (r === 'granted') tiltEnabled = true;
-      }).catch(() => {});
-    } else {
-      tiltEnabled = true;
-    }
+      DeviceOrientationEvent.requestPermission().then(r => { if (r==='granted') tiltEnabled=true; }).catch(()=>{});
+    } else tiltEnabled = true;
   }
 }
 
-// Controls — tilt
 window.addEventListener('deviceorientation', e => {
-  if (!tiltEnabled || !running) return;
-  const gamma = e.gamma || 0; // -90 to 90, left/right tilt
-  steerInput = Math.max(-1, Math.min(1, gamma / 25));
+  if (!tiltEnabled||!running) return;
+  steerInput = Math.max(-1, Math.min(1, (e.gamma||0)/25));
 });
 
-// Controls — touch (left/right halves)
-canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  const x = e.touches[0].clientX;
-  touchSide = x < W / 2 ? -1 : 1;
-  document.getElementById('hint').style.display = 'none';
-}, {passive: false});
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  const x = e.touches[0].clientX;
-  touchSide = x < W / 2 ? -1 : 1;
-}, {passive: false});
-canvas.addEventListener('touchend', e => { touchSide = 0; });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); touchSide = e.touches[0].clientX < W/2 ? -1 : 1; }, {passive:false});
+canvas.addEventListener('touchmove', e => { e.preventDefault(); touchSide = e.touches[0].clientX < W/2 ? -1 : 1; }, {passive:false});
+canvas.addEventListener('touchend', () => { touchSide = 0; });
 
-// Controls — keyboard
 const keys = {};
-window.addEventListener('keydown', e => { keys[e.key] = true; });
-window.addEventListener('keyup', e => { keys[e.key] = false; });
+window.addEventListener('keydown', e => keys[e.key]=true);
+window.addEventListener('keyup', e => keys[e.key]=false);
 
 function getRoadBounds() {
   const roadW = W * ROAD_W_RATIO;
   const roadL = (W - roadW) / 2;
   return { roadL, roadW, roadR: roadL + roadW };
 }
-
 function laneToX(lane) {
-  const { roadL, roadW } = getRoadBounds();
-  const laneW = roadW / LANES;
-  return roadL + laneW * (lane + 0.5);
+  const {roadL,roadW} = getRoadBounds();
+  return roadL + (roadW/LANES) * (lane + 0.5);
 }
-
 function playerScreenX() {
-  const { roadL, roadW } = getRoadBounds();
-  return roadL + roadW / 2 + playerX * (roadW / 2 - 24);
+  const {roadL,roadW} = getRoadBounds();
+  return roadL + roadW/2 + playerX * (roadW/2 - 24);
 }
 
 function update() {
   if (!running) return;
 
-  // Speed gradually increases
-  if (boosting > 0) {
-    speed = Math.min(maxSpeed * 1.8, speed + 0.3);
-    boosting--;
-  } else {
-    speed = Math.min(maxSpeed, speed + 0.002);
-  }
-
+  if (boosting > 0) { speed = Math.min(maxSpeed*1.6, speed+0.2); boosting--; }
+  else speed = Math.min(maxSpeed, speed + 0.002);
   distance += speed;
   score = Math.floor(distance / 10);
 
-  // Steering
   let steer = 0;
-  if (touchSide !== 0) steer = touchSide;
-  else if (keys['ArrowLeft'] || keys['a']) steer = -1;
-  else if (keys['ArrowRight'] || keys['d']) steer = 1;
+  if (touchSide) steer = touchSide;
+  else if (keys.ArrowLeft||keys.a) steer = -1;
+  else if (keys.ArrowRight||keys.d) steer = 1;
   else if (tiltEnabled) steer = steerInput;
 
-  playerTargetX += steer * 0.04;
+  playerTargetX += steer * 0.045;
   playerTargetX = Math.max(-0.92, Math.min(0.92, playerTargetX));
   playerX += (playerTargetX - playerX) * 0.15;
 
-  // Road lines scroll
-  roadLines.forEach(l => {
-    l.y += speed;
-    if (l.y > H + 40) l.y -= H + 80;
-  });
+  roadLines.forEach(l => { l.y += speed; if (l.y > H+40) l.y -= H+80; });
 
-  // Spawn obstacles
+  // Spawn enemies
   spawnTimer += speed;
-  const spawnGap = Math.max(90, 200 - distance * 0.005);
-  if (spawnTimer > spawnGap) {
+  if (spawnTimer > Math.max(35, 180 - distance*0.004)) {
     spawnTimer = 0;
-    const lane = Math.floor(Math.random() * LANES);
-    const emoji = TRAFFIC[Math.floor(Math.random() * TRAFFIC.length)];
+    const lane = Math.floor(Math.random()*LANES);
+    const type = ENEMIES[Math.floor(Math.random()*ENEMIES.length)];
+    const speedMult = Math.min(1+(distance*0.00005), 2);
     obstacles.push({
-      x: laneToX(lane),
-      y: -50,
-      emoji,
-      w: 36, h: 44,
-      speed: speed * (0.3 + Math.random() * 0.3), // slower than player
+      x: laneToX(lane), y: -50, type,
+      vy: speed * (0.3 + Math.random()*0.25) * speedMult,
     });
   }
 
   // Spawn coins
   coinTimer += speed;
-  if (coinTimer > 80) {
+  if (coinTimer > 70) {
     coinTimer = 0;
-    const lane = Math.floor(Math.random() * LANES);
-    coins.push({ x: laneToX(lane), y: -30, collected: false });
+    const lane = Math.floor(Math.random()*LANES);
+    coins.push({ x: laneToX(lane), y: -30 });
   }
 
-  // Spawn boost
-  boostTimer += speed;
-  if (boostTimer > 600) {
-    boostTimer = 0;
-    const lane = Math.floor(Math.random() * LANES);
-    boosts.push({ x: laneToX(lane), y: -30 });
+  // Spawn items (mushroom/star)
+  itemTimer += speed;
+  if (itemTimer > 500) {
+    itemTimer = 0;
+    const lane = Math.floor(Math.random()*LANES);
+    const type = Math.random() > 0.5 ? 'mushroom' : 'star';
+    items.push({ x: laneToX(lane), y: -30, type });
   }
 
-  const px = playerScreenX();
-  const py = H - 70;
+  const px = playerScreenX(), py = H - 70;
 
-  // Update obstacles
-  for (let i = obstacles.length - 1; i >= 0; i--) {
+  // Obstacles
+  for (let i = obstacles.length-1; i >= 0; i--) {
     const o = obstacles[i];
-    o.y += speed - o.speed;
-    if (o.y > H + 60) { obstacles.splice(i, 1); continue; }
-
-    // Collision
-    const dx = Math.abs(px - o.x);
-    const dy = Math.abs(py - o.y);
-    if (dx < 30 && dy < 36) {
-      crash();
-      return;
-    }
-  }
-
-  // Update coins
-  for (let i = coins.length - 1; i >= 0; i--) {
-    const c = coins[i];
-    c.y += speed;
-    if (c.y > H + 30) { coins.splice(i, 1); continue; }
-    if (!c.collected) {
-      const dx = Math.abs(px - c.x); const dy = Math.abs(py - c.y);
-      if (dx < 28 && dy < 28) {
-        c.collected = true;
-        score += 50;
-        spawnParticles(c.x, c.y, 8, '#ffd200');
-        coins.splice(i, 1);
+    o.y += speed - o.vy;
+    if (o.y > H+60) { obstacles.splice(i,1); continue; }
+    if (Math.abs(px-o.x) < 28 && Math.abs(py-o.y) < 34) {
+      if (starPower > 0) {
+        spawnParticles(o.x,o.y,12,'#ffd200');
+        score += 100;
+        obstacles.splice(i,1);
+      } else if (invincible <= 0) {
+        crash(); return;
       }
     }
   }
 
-  // Update boosts
-  for (let i = boosts.length - 1; i >= 0; i--) {
-    const b = boosts[i];
-    b.y += speed;
-    if (b.y > H + 30) { boosts.splice(i, 1); continue; }
-    const dx = Math.abs(px - b.x); const dy = Math.abs(py - b.y);
-    if (dx < 28 && dy < 28) {
-      boosting = 90;
-      spawnParticles(b.x, b.y, 12, '#00d2ff');
-      boosts.splice(i, 1);
+  // Coins
+  for (let i = coins.length-1; i >= 0; i--) {
+    const c = coins[i]; c.y += speed;
+    if (c.y > H+30) { coins.splice(i,1); continue; }
+    if (Math.abs(px-c.x) < 26 && Math.abs(py-c.y) < 26) {
+      score += 50;
+      spawnParticles(c.x,c.y,6,'#ffd200');
+      coins.splice(i,1);
+    }
+  }
+
+  // Items
+  for (let i = items.length-1; i >= 0; i--) {
+    const it = items[i]; it.y += speed;
+    if (it.y > H+30) { items.splice(i,1); continue; }
+    if (Math.abs(px-it.x) < 26 && Math.abs(py-it.y) < 26) {
+      if (it.type === 'mushroom') { boosting = 90; spawnParticles(it.x,it.y,10,'#ff4444'); }
+      else { starPower = 180; spawnParticles(it.x,it.y,15,'#ffff00'); }
+      items.splice(i,1);
     }
   }
 
   // Particles
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.x += p.vx; p.y += p.vy;
-    p.life--;
-    if (p.life <= 0) particles.splice(i, 1);
+  for (let i = particles.length-1; i >= 0; i--) {
+    const p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--;
+    if (p.life <= 0) particles.splice(i,1);
   }
 
   if (shakeTimer > 0) shakeTimer--;
+  if (invincible > 0) invincible--;
+  if (starPower > 0) starPower--;
 }
 
 function crash() {
-  running = false;
-  shakeTimer = 20;
-  spawnParticles(playerScreenX(), H - 70, 30, '#ff4444');
-  spawnParticles(playerScreenX(), H - 70, 20, '#ffd200');
+  running = false; shakeTimer = 20;
+  spawnParticles(playerScreenX(), H-70, 30, '#ff4444');
   setTimeout(() => {
     document.getElementById('finalScore').textContent = score;
-    document.getElementById('finalDist').textContent = Math.floor(distance) + 'm';
+    document.getElementById('finalDist').textContent = Math.floor(distance)+'m';
     document.getElementById('gameOverScreen').classList.remove('hidden');
-  }, 600);
+  }, 500);
 }
 
-function spawnParticles(x, y, count, color) {
-  for (let i = 0; i < count; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const s = Math.random() * 5 + 1;
-    particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 25+Math.random()*15, maxLife: 40, size: 2+Math.random()*4, color });
+function spawnParticles(x,y,count,color) {
+  for (let i=0;i<count;i++) {
+    const a = Math.random()*Math.PI*2, s = Math.random()*5+1;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20+Math.random()*15,maxLife:35,size:2+Math.random()*4,color});
   }
 }
 
 function draw() {
-  ctx.clearRect(0, 0, W, H);
+  ctx.clearRect(0,0,W,H);
+  if (shakeTimer>0) { ctx.save(); ctx.translate((Math.random()-.5)*10,(Math.random()-.5)*10); }
 
-  if (shakeTimer > 0) {
-    ctx.save();
-    ctx.translate((Math.random()-0.5)*10, (Math.random()-0.5)*10);
-  }
-
-  const { roadL, roadW, roadR } = getRoadBounds();
+  const {roadL,roadW,roadR} = getRoadBounds();
   const laneW = roadW / LANES;
 
   // Grass
-  ctx.fillStyle = '#2d8a2d';
-  ctx.fillRect(0, 0, W, H);
-
-  // Grass stripes (scrolling)
+  ctx.fillStyle = '#2d8a2d'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle = '#2a7d2a';
-  roadLines.forEach(l => {
-    ctx.fillRect(0, l.y, roadL - 4, 18);
-    ctx.fillRect(roadR + 4, l.y, W - roadR, 18);
-  });
+  roadLines.forEach(l => { ctx.fillRect(0,l.y,roadL-4,18); ctx.fillRect(roadR+4,l.y,W-roadR,18); });
 
   // Road
-  ctx.fillStyle = '#333';
-  ctx.fillRect(roadL, 0, roadW, H);
-
-  // Road edge lines
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(roadL - 3, 0, 3, H);
-  ctx.fillRect(roadR, 0, 3, H);
+  ctx.fillStyle = '#444'; ctx.fillRect(roadL,0,roadW,H);
+  // Curbs (red/white)
+  for (let y = 0; y < H; y += 20) {
+    ctx.fillStyle = (Math.floor(y/20) + Math.floor(distance/20)) % 2 ? '#cc0000' : '#fff';
+    ctx.fillRect(roadL-6, y, 6, 10);
+    ctx.fillRect(roadR, y, 6, 10);
+  }
 
   // Lane dashes
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  for (let i = 1; i < LANES; i++) {
-    const lx = roadL + laneW * i - 1.5;
-    roadLines.forEach(l => {
-      ctx.fillRect(lx, l.y, 3, 20);
-    });
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  for (let i=1;i<LANES;i++) {
+    const lx = roadL + laneW*i - 1.5;
+    roadLines.forEach(l => ctx.fillRect(lx,l.y,3,20));
   }
 
-  // Speed lines when boosting
-  if (boosting > 0) {
-    ctx.strokeStyle = `rgba(0,210,255,${0.3 + Math.random()*0.2})`;
+  // Boost lines
+  if (boosting > 0 || starPower > 0) {
+    const c = starPower > 0 ? 'rgba(255,255,0,' : 'rgba(0,210,255,';
+    ctx.strokeStyle = c + (0.2+Math.random()*0.2)+')';
     ctx.lineWidth = 2;
-    for (let i = 0; i < 6; i++) {
-      const sx = roadL + Math.random() * roadW;
-      const sy = Math.random() * H;
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + 30 + Math.random()*20);
-      ctx.stroke();
+    for (let i=0;i<8;i++) {
+      const sx = roadL+Math.random()*roadW, sy = Math.random()*H;
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx,sy+25+Math.random()*20); ctx.stroke();
     }
   }
 
-  // Coins
-  ctx.font = '28px serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  coins.forEach(c => {
-    ctx.fillText(COIN_EMOJI, c.x, c.y);
-  });
+  // Draw items (coin, mushroom, star)
+  coins.forEach(c => drawSprite('item_coin', c.x, c.y, 28));
+  items.forEach(it => drawSprite('item_'+it.type, it.x, it.y, 30));
 
-  // Boosts
-  ctx.font = '30px serif';
-  boosts.forEach(b => {
-    ctx.fillText(BOOST_EMOJI, b.x, b.y);
-  });
+  // Draw enemies
+  obstacles.forEach(o => drawSprite('enemy_'+o.type, o.x, o.y, 44));
 
-  // Obstacles
-  obstacles.forEach(o => {
-    ctx.font = `${o.h}px serif`;
-    ctx.fillText(o.emoji, o.x, o.y);
-  });
+  // Draw player
+  const px = playerScreenX(), py = H - 70;
+  if (starPower > 0) {
+    // Rainbow glow
+    ctx.shadowColor = ['#f00','#ff0','#0f0','#00f','#f0f'][Math.floor(Date.now()/80)%5];
+    ctx.shadowBlur = 20;
+  }
+  drawSprite('char_'+selectedChar, px, py, 48);
+  ctx.shadowBlur = 0;
 
-  // Player
-  const px = playerScreenX();
-  const py = H - 70;
-  if (running || Math.floor(Date.now()/100)%2) {
-    ctx.font = '42px serif';
-    ctx.fillText(playerChar, px, py);
-
-    // Exhaust particles
-    if (running && Math.random() > 0.5) {
-      const side = (Math.random() - 0.5) * 10;
-      particles.push({
-        x: px + side, y: py + 24,
-        vx: (Math.random()-0.5)*1, vy: 2 + Math.random()*2,
-        life: 10+Math.random()*8, maxLife: 18,
-        size: 2+Math.random()*3,
-        color: boosting > 0 ? '#00d2ff' : '#888',
-      });
-    }
+  // Exhaust
+  if (running && Math.random()>0.4) {
+    particles.push({
+      x:px+(Math.random()-.5)*10, y:py+24,
+      vx:(Math.random()-.5)*1, vy:2+Math.random()*2,
+      life:8+Math.random()*6, maxLife:14,
+      size:2+Math.random()*3,
+      color: starPower>0?'#ff0':boosting>0?'#f44':'#888',
+    });
   }
 
   // Particles
   particles.forEach(p => {
-    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.globalAlpha = p.life/p.maxLife;
     ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
   });
   ctx.globalAlpha = 1;
 
   // HUD
   if (running) {
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, 0, W, 40);
-
-    ctx.font = 'bold 16px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ffd200';
-    ctx.fillText(`⭐ ${score}`, 12, 26);
-
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(`${Math.floor(distance)}m`, W/2, 26);
-
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,38);
+    ctx.font = 'bold 15px system-ui'; ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left'; ctx.fillStyle = '#ffd200';
+    ctx.fillText('🪙 '+score, 12, 20);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+    ctx.fillText(Math.floor(distance)+'m', W/2, 20);
     ctx.textAlign = 'right';
-    const kmh = Math.floor(speed * 15);
-    ctx.fillStyle = boosting > 0 ? '#00d2ff' : '#fff';
-    ctx.fillText(`${kmh} km/h`, W - 12, 26);
+    ctx.fillStyle = starPower>0?'#ff0':boosting>0?'#0df':'#fff';
+    ctx.fillText(Math.floor(speed*15)+' km/h', W-12, 20);
   }
 
-  if (shakeTimer > 0) ctx.restore();
+  if (shakeTimer>0) ctx.restore();
 }
 
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
+function drawSprite(key, x, y, size) {
+  const img = images[key];
+  if (img && img.complete) {
+    ctx.drawImage(img, x-size/2, y-size/2, size, size);
+  } else {
+    // Fallback circle
+    ctx.fillStyle = '#f0f';
+    ctx.beginPath(); ctx.arc(x,y,size/3,0,Math.PI*2); ctx.fill();
+  }
 }
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
 loop();
 </script>
 </body>
